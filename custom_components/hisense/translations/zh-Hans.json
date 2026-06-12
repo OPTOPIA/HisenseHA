@@ -21,11 +21,11 @@
     "error": {
       "cannot_connect": "无法连接到设备",
       "invalid_auth": "登录失败",
-      "no_devices": "没有找到支持的海信空调设备",
+      "no_devices": "没有找到支持的海信设备",
       "no_homes": "此账号下没有找到家庭",
       "unknown": "发生未知错误"
     },
-    "title": "海信空调"
+    "title": "海信智能设备"
   },
   "device": {
     "hisense_ac": {
@@ -52,6 +52,17 @@
       },
       "refresh_token": {
         "name": "刷新令牌"
+      }
+    },
+    "sensor": {
+      "device_type": {
+        "name": "设备类型"
+      },
+      "device_id": {
+        "name": "设备 ID"
+      },
+      "raw_status": {
+        "name": "原始状态长度"
       }
     },
     "number": {

@@ -4,13 +4,13 @@
 
 [简体中文](README_zh-Hans.md)
 
-Home Assistant custom integration for **Hisense** cloud-connected smart devices. Only **Air conditioners (AC)** are supported. If you want support for more device types, **pull requests** are welcome.
+Home Assistant custom integration for **Hisense** cloud-connected smart devices. Air conditioners (AC) are supported with control entities. Washing machines and projectors can be added as basic diagnostic devices while their cloud status and command formats are still being mapped.
 
 ## Requirements
 
 - **Home Assistant** 2025.6 or newer (for older cores, see [releases](https://github.com/manymuch/HisenseHA/releases)).
 - A **Hisense account** that can sign in to the official mobile app (same username and password).
-- The AC must already be paired in the app and belong to a **home**.
+- The device must already be paired in the app and belong to a **home**.
 
 ## Install the integration
 
@@ -35,8 +35,13 @@ Home Assistant custom integration for **Hisense** cloud-connected smart devices.
 1. Go to **Settings** → **Devices & services** → **Add integration**.
 2. Search for **Hisense Smart Devices** (or **Hisense**) and select it.
 3. Enter your **Hisense app username and password** (wrong credentials will show an authentication error).
-4. Choose the **home** that contains your AC.
+4. Choose the **home** that contains your Hisense device.
 5. Select one or more **devices**, then finish the wizard.
+
+## Supported devices
+
+- **Air conditioners**: climate, AC switches, temperature limit configuration, and diagnostic buttons.
+- **Washing machines and projectors**: basic device registration, diagnostic refresh buttons, and diagnostic sensors for device type, device ID, and raw cloud status length. Control entities are not implemented yet because real status arrays and app command samples are still needed.
 
 ## Status sync
 

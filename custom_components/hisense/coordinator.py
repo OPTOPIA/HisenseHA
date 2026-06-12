@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN
-from .pyhisenseapi import HiSenseAC
+from .pyhisenseapi import HiSenseDeviceClient
 
 import logging
 
@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 class HisenseDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Coordinator for a single Hisense AC device."""
 
-    def __init__(self, hass: HomeAssistant, client: HiSenseAC) -> None:
+    def __init__(self, hass: HomeAssistant, client: HiSenseDeviceClient) -> None:
         """Initialize the coordinator."""
         self.client = client
         super().__init__(
@@ -43,9 +43,18 @@ class HisenseDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             status = await self.client.check_status()
         except Exception as err:
+            if not self.client.is_ac:
+                status = self.client.get_status()
+                status["last_refresh_success"] = False
+                return status
             raise UpdateFailed("Failed to fetch Hisense AC status") from err
         if not status:
+            if not self.client.is_ac:
+                status = self.client.get_status()
+                status["last_refresh_success"] = False
+                return status
             raise UpdateFailed("Failed to fetch Hisense AC status")
+        status["last_refresh_success"] = True
         return status
 
     def async_update_from_client(self) -> None:

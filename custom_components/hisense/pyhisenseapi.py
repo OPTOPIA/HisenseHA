@@ -2,6 +2,13 @@ from collections import Counter
 from copy import deepcopy
 import time
 import logging
+
+from .const import (
+    DEVICE_TYPE_AC,
+    DEVICE_TYPE_UNKNOWN,
+    SUPPORTED_DEVICE_KEYWORDS,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 _STATUS_SWING_MODES = {0, 1, 2, 3}
@@ -21,6 +28,13 @@ def _device_select_label(device: dict, device_id: str) -> str:
     if device_name:
         return device_name
     return device_id
+
+
+def _device_type_from_name(device_type_name: str) -> str:
+    for keyword, device_type in SUPPORTED_DEVICE_KEYWORDS.items():
+        if keyword in device_type_name:
+            return device_type
+    return DEVICE_TYPE_UNKNOWN
 
 
 class HiSenseLogin:
@@ -102,10 +116,8 @@ class HiSenseLogin:
             else:
                 return None
 
-    async def get_device_wifi_id_and_labels(
-        self, access_token, home_id, device_keywords="空调"
-    ):
-        """Return (device_id -> wifi_id, device_id -> UI label) for filtered devices."""
+    async def get_device_wifi_id_and_labels(self, access_token, home_id):
+        """Return (device_id -> metadata, device_id -> UI label) for supported devices."""
         timestamp = self.get_timestamp()
         url='https://api-wg.hismarttv.com/wg/dm/getHomeDeviceList'
         headers = {
@@ -129,14 +141,22 @@ class HiSenseLogin:
             result_code = result["response"]["resultCode"]
             if result_code == 0:
                 device_list = result["response"]["deviceList"]
-                device_wifi_id_dict = {}
+                device_info_by_id = {}
                 raw_labels = {}
                 for device in device_list:
-                    device_type_name = device["deviceTypeName"]
-                    if device_keywords in device_type_name:
+                    device_type_name = (device.get("deviceTypeName") or "").strip()
+                    device_type = _device_type_from_name(device_type_name)
+                    if device_type != DEVICE_TYPE_UNKNOWN:
                         did = device["deviceId"]
-                        device_wifi_id_dict[did] = device["wifiId"]
-                        raw_labels[did] = _device_select_label(device, did)
+                        device_name = _device_select_label(device, did)
+                        device_info_by_id[did] = {
+                            "device_id": did,
+                            "wifi_id": device["wifiId"],
+                            "device_type": device_type,
+                            "device_type_name": device_type_name,
+                            "device_name": device_name,
+                        }
+                        raw_labels[did] = f"{device_name} ({device_type_name})"
                 label_counts = Counter(raw_labels.values())
                 device_id_to_label = {}
                 for did, base in raw_labels.items():
@@ -145,18 +165,30 @@ class HiSenseLogin:
                         device_id_to_label[did] = f"{base} ({suffix})"
                     else:
                         device_id_to_label[did] = base
-                return device_wifi_id_dict, device_id_to_label
+                return device_info_by_id, device_id_to_label
             else:
                 return None
 
 
-class HiSenseAC:
-    def __init__(self, wifi_id, device_id, refresh_token, session):
+class HiSenseDeviceClient:
+    def __init__(
+        self,
+        wifi_id,
+        device_id,
+        refresh_token,
+        session,
+        device_type=DEVICE_TYPE_UNKNOWN,
+        device_type_name="",
+        device_name=None,
+    ):
         self.wifi_id = wifi_id
         self.device_id = device_id
         self.refresh_token = refresh_token
         self.access_token = None
         self.session = session
+        self.device_type = device_type
+        self.device_type_name = device_type_name
+        self.device_name = device_name or device_id
         app_name_encoding = "%E6%B5%B7%E4%BF%A1%E6%99%BA%E6%85%A7%E5%AE%B6"
         # app_name = "海信智慧家"
         # app_name_encoding = urllib.parse.quote(app_name)
@@ -204,24 +236,32 @@ class HiSenseAC:
             "cmdVersion": "1684085201",
         }
         self.status = {
-            "power_on": False,
+            "device_type": self.device_type,
+            "device_type_name": self.device_type_name,
+            "device_name": self.device_name,
+            "raw_status": None,
+            "raw_status_length": None,
         }
-        self.hvac_mode_lookup = {
-            0: "FAN_ONLY",
-            1: "HEAT",
-            2: "COOL",
-            3: "DRY",
-            4: "AUTO",
-        }
-        self.fan_mode_lookup = {
-            0: "AUTO",
-            1: "DIFFUSE",
-            2: "LOW",
-            3: "MEDIUM",
-            4: "HIGH",
-        }
-        self.climate_min_temp = 16
-        self.climate_max_temp = 32
+
+    @property
+    def is_ac(self):
+        return self.device_type == DEVICE_TYPE_AC
+
+    def _update_status_from_result(self, result):
+        try:
+            result_list_str = self._extract_status_payload(result)
+        except ValueError:
+            _LOGGER.error("Hisense response did not include a usable status payload")
+            return False
+
+        raw_values = [i.strip() for i in result_list_str.split(",")]
+        self.status.update(
+            {
+                "raw_status": result_list_str,
+                "raw_status_length": len(raw_values),
+            }
+        )
+        return True
 
     async def _send_command(self, url, command_data, status_required=True):
         post_url = f"{url}{self.access_token}"
@@ -259,7 +299,6 @@ class HiSenseAC:
         if not status_required:
             return None
 
-        _LOGGER.error("Hisense response did not include a usable status payload")
         return False
 
     async def _robust_send_command(self, url, command_data, status_required=True):
@@ -290,46 +329,6 @@ class HiSenseAC:
                     return device_status
 
         raise ValueError("missing status payload")
-
-    def _update_status_from_result(self, result):
-        try:
-            result_list_str = self._extract_status_payload(result)
-            result_list = [int(i.strip()) for i in result_list_str.split(",")]
-            if len(result_list) < _MIN_STATUS_VALUES:
-                raise ValueError(
-                    f"status payload has {len(result_list)} values, "
-                    f"expected at least {_MIN_STATUS_VALUES}"
-                )
-
-            fan_mode_id = result_list[0]
-            hvac_mode_id = result_list[4]
-            swing_mode_id = result_list[209]
-            if fan_mode_id not in self.fan_mode_lookup:
-                raise ValueError(f"unknown fan mode id {fan_mode_id}")
-            if hvac_mode_id not in self.hvac_mode_lookup:
-                raise ValueError(f"unknown hvac mode id {hvac_mode_id}")
-            if swing_mode_id not in _STATUS_SWING_MODES:
-                raise ValueError(f"unknown swing mode id {swing_mode_id}")
-
-            status = {
-                "desired_temperature": result_list[9],
-                "indoor_temperature": result_list[10],
-                "hvac_mode_id": hvac_mode_id,
-                "hvac_mode": self.hvac_mode_lookup[hvac_mode_id],
-                "fan_mode_id": fan_mode_id,
-                "fan_mode": self.fan_mode_lookup[fan_mode_id],
-                "screen_on": result_list[58] == 1,
-                "power_on": result_list[5] == 1,
-                "aux_heat": result_list[45] == 1,
-                "nature_wind": result_list[44] == 1,
-                "swing_mode_id": swing_mode_id,
-            }
-        except (IndexError, TypeError, ValueError):
-            _LOGGER.error("Failed to parse Hisense status response", exc_info=True)
-            return False
-
-        self.status.update(status)
-        return True
 
     async def _send_command_and_update_status(self, url, command_data):
         result = await self._robust_send_command(
@@ -392,3 +391,78 @@ class HiSenseAC:
         except Exception:
             _LOGGER.error("Failed to refresh token", exc_info=True)
             return False
+
+
+class HiSenseACClient(HiSenseDeviceClient):
+    def __init__(self, wifi_id, device_id, refresh_token, session, **kwargs):
+        kwargs.pop("device_type", None)
+        super().__init__(
+            wifi_id,
+            device_id,
+            refresh_token,
+            session,
+            device_type=DEVICE_TYPE_AC,
+            **kwargs,
+        )
+        self.status["power_on"] = False
+        self.hvac_mode_lookup = {
+            0: "FAN_ONLY",
+            1: "HEAT",
+            2: "COOL",
+            3: "DRY",
+            4: "AUTO",
+        }
+        self.fan_mode_lookup = {
+            0: "AUTO",
+            1: "DIFFUSE",
+            2: "LOW",
+            3: "MEDIUM",
+            4: "HIGH",
+        }
+        self.climate_min_temp = 16
+        self.climate_max_temp = 32
+
+    def _update_status_from_result(self, result):
+        try:
+            result_list_str = self._extract_status_payload(result)
+            result_list = [int(i.strip()) for i in result_list_str.split(",")]
+            if len(result_list) < _MIN_STATUS_VALUES:
+                raise ValueError(
+                    f"status payload has {len(result_list)} values, "
+                    f"expected at least {_MIN_STATUS_VALUES}"
+                )
+
+            fan_mode_id = result_list[0]
+            hvac_mode_id = result_list[4]
+            swing_mode_id = result_list[209]
+            if fan_mode_id not in self.fan_mode_lookup:
+                raise ValueError(f"unknown fan mode id {fan_mode_id}")
+            if hvac_mode_id not in self.hvac_mode_lookup:
+                raise ValueError(f"unknown hvac mode id {hvac_mode_id}")
+            if swing_mode_id not in _STATUS_SWING_MODES:
+                raise ValueError(f"unknown swing mode id {swing_mode_id}")
+
+            status = {
+                "raw_status": result_list_str,
+                "raw_status_length": len(result_list),
+                "desired_temperature": result_list[9],
+                "indoor_temperature": result_list[10],
+                "hvac_mode_id": hvac_mode_id,
+                "hvac_mode": self.hvac_mode_lookup[hvac_mode_id],
+                "fan_mode_id": fan_mode_id,
+                "fan_mode": self.fan_mode_lookup[fan_mode_id],
+                "screen_on": result_list[58] == 1,
+                "power_on": result_list[5] == 1,
+                "aux_heat": result_list[45] == 1,
+                "nature_wind": result_list[44] == 1,
+                "swing_mode_id": swing_mode_id,
+            }
+        except (IndexError, TypeError, ValueError):
+            _LOGGER.error("Failed to parse Hisense status response", exc_info=True)
+            return False
+
+        self.status.update(status)
+        return True
+
+
+HiSenseAC = HiSenseACClient

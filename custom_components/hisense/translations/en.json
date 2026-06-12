@@ -21,11 +21,11 @@
     "error": {
       "cannot_connect": "Unable to connect to the device",
       "invalid_auth": "Failed to login",
-      "no_devices": "No supported Hisense AC devices were found",
+      "no_devices": "No supported Hisense devices were found",
       "no_homes": "No homes were found for this account",
       "unknown": "An unknown error occurred"
     },
-    "title": "Hisense AC"
+    "title": "Hisense Smart Devices"
   },
   "device": {
     "hisense_ac": {
@@ -52,6 +52,17 @@
       },
       "refresh_token": {
         "name": "Refresh token"
+      }
+    },
+    "sensor": {
+      "device_type": {
+        "name": "Device type"
+      },
+      "device_id": {
+        "name": "Device ID"
+      },
+      "raw_status": {
+        "name": "Raw status length"
       }
     },
     "number": {

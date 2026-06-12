@@ -31,6 +31,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     entities = [
         HisenseACClimate(coordinator)
         for coordinator in coordinators.values()
+        if coordinator.client.is_ac
     ]
     async_add_entities(entities)
 

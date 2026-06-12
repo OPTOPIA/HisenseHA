@@ -12,16 +12,16 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     coordinators = hass.data[DOMAIN][config_entry.entry_id]
-    entities = [HisenseACUpdateButton(coordinator) for coordinator in coordinators.values()]
+    entities = [HisenseUpdateButton(coordinator) for coordinator in coordinators.values()]
     async_add_entities(entities)
     entities = [
-        HisenseACRefreshTokenButton(coordinator)
+        HisenseRefreshTokenButton(coordinator)
         for coordinator in coordinators.values()
     ]
     async_add_entities(entities)
 
 
-class HisenseACUpdateButton(HisenseEntity, ButtonEntity):
+class HisenseUpdateButton(HisenseEntity, ButtonEntity):
     _attr_translation_key = "force_update"
 
     def __init__(self, coordinator):
@@ -34,10 +34,10 @@ class HisenseACUpdateButton(HisenseEntity, ButtonEntity):
         _LOGGER.debug(f"Button pressed for entity: {self._attr_unique_id}")
         await self.coordinator.async_request_refresh()
         if not self.coordinator.last_update_success:
-            raise HomeAssistantError("Failed to refresh Hisense AC status")
+            raise HomeAssistantError("Failed to refresh Hisense device status")
 
 
-class HisenseACRefreshTokenButton(HisenseEntity, ButtonEntity):
+class HisenseRefreshTokenButton(HisenseEntity, ButtonEntity):
     _attr_translation_key = "refresh_token"
 
     def __init__(self, coordinator):

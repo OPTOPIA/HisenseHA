@@ -13,7 +13,7 @@ class HisenseACConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._home_options = None
         self._access_token = None
         self._refresh_token = None
-        self._device_wifi_id_dict = None
+        self._device_info_by_id = None
         self._device_id_to_label = None
 
     async def async_step_user(self, user_input=None):
@@ -82,8 +82,8 @@ class HisenseACConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if pair is None:
                     errors["base"] = "cannot_connect"
                 else:
-                    self._device_wifi_id_dict, self._device_id_to_label = pair
-                    if not self._device_wifi_id_dict:
+                    self._device_info_by_id, self._device_id_to_label = pair
+                    if not self._device_info_by_id:
                         errors["base"] = "no_devices"
                     else:
                         return await self.async_step_device()
@@ -105,10 +105,10 @@ class HisenseACConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "no_devices"
             else:
                 devices = [
-                    {"device_id": device_id,
-                     "wifi_id": self._device_wifi_id_dict[device_id],
-                     "refresh_token": self._refresh_token,
-                     }
+                    {
+                        **self._device_info_by_id[device_id],
+                        "refresh_token": self._refresh_token,
+                    }
                     for device_id in device_ids
                 ]
                 return self.async_create_entry(

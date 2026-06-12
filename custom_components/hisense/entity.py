@@ -8,7 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, device_suggested_object_id
 from .coordinator import HisenseDataUpdateCoordinator
-from .pyhisenseapi import HiSenseAC
+from .pyhisenseapi import HiSenseDeviceClient
 
 
 class HisenseEntity(CoordinatorEntity[HisenseDataUpdateCoordinator]):
@@ -31,7 +31,7 @@ class HisenseEntity(CoordinatorEntity[HisenseDataUpdateCoordinator]):
         )
 
     @property
-    def client(self) -> HiSenseAC:
+    def client(self) -> HiSenseDeviceClient:
         """Return the device API client."""
         return self.coordinator.client
 
@@ -45,7 +45,7 @@ class HisenseEntity(CoordinatorEntity[HisenseDataUpdateCoordinator]):
         """Return Home Assistant device registry info."""
         return {
             "identifiers": {(DOMAIN, self.client.device_id)},
-            "name": "Hisense AC",
-            "translation_key": "hisense_ac",
+            "name": self.client.device_name,
             "manufacturer": "Hisense",
+            "model": self.client.device_type_name or self.client.device_type,
         }

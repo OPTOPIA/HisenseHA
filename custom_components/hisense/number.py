@@ -36,6 +36,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     entities = [
         HisenseClimateLimitNumber(coordinator, desc, desc.key == "climate_min_temp")
         for coordinator in coordinators.values()
+        if coordinator.client.is_ac
         for desc in CLIMATE_LIMIT_DESCRIPTIONS
     ]
     async_add_entities(entities)
