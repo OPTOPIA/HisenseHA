@@ -4,7 +4,7 @@
 
 [简体中文](README_zh-Hans.md)
 
-Home Assistant custom integration for **Hisense** cloud-connected smart devices. Air conditioners (AC) are supported with control entities. Washing machines and projectors can be added as basic diagnostic devices while their cloud status and command formats are still being mapped.
+Home Assistant custom integration for **Hisense** cloud-connected smart devices. Air conditioners (AC) are supported with control entities. Washing machines, projectors, and refrigerators can be added as basic diagnostic devices while their cloud status and command formats are still being mapped.
 
 ## Requirements
 
@@ -41,7 +41,7 @@ Home Assistant custom integration for **Hisense** cloud-connected smart devices.
 ## Supported devices
 
 - **Air conditioners**: climate, AC switches, temperature limit configuration, and diagnostic buttons.
-- **Washing machines and projectors**: basic device registration, diagnostic refresh buttons, and diagnostic sensors for device type, device ID, and raw cloud status length. Control entities are not implemented yet because real status arrays and app command samples are still needed.
+- **Washing machines, projectors, and refrigerators**: basic device registration, diagnostic refresh buttons, and diagnostic sensors for device type, device ID, and raw cloud status length. Projectors are matched by device type names containing projector-related terms such as `投影` or `激光电视`. Control entities are not implemented yet because real status arrays and app command samples are still needed.
 
 ## Status sync
 
